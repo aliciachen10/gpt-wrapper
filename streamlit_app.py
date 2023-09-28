@@ -1,7 +1,7 @@
 import streamlit as st
 from langchain.llms import OpenAI
 
-st.title('🦜🔗 Chat with OpenAI')
+st.title('🦜🔗 Chat with Your Coach')
 
 openai_api_key = st.sidebar.text_input('OpenAI API Key')
 
@@ -22,12 +22,14 @@ else:
         else:
             st.write(f"🤖: {exchange['message']}")
 
-    # Input area for user's message
-    user_input = st.text_input('Your Message:')
+    # Chatbox for back and forth interaction
+    with st.form(key='chatbox'):
+        user_input = st.text_area('Your Message:', max_chars=500, height=100, key='user_input')
+        send_button = st.form_submit_button('Send')
 
-    if st.button('Send'):
+    if send_button and user_input:
         # Add user's message to the conversation
-        conversation_history.append({'role': 'user', 'message': user_input})
+        conversation_history.append({'role': 'user', 'message': user_input.strip()})
 
         # Get model's response
         model_response = llm(user_input)
