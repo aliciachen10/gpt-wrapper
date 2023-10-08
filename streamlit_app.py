@@ -3,10 +3,7 @@ from langchain.llms import OpenAI
 
 st.title('🦜🔗 Chat with Your Coach')
 
-# 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
-openai_api_key = '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' or st.sidebar.text_input('OpenAI API Key')
-
-# print("API_KEY" + openai_api_key)
+openai_api_key = st.sidebar.text_input('OpenAI API Key')
 
 # Ensure the OpenAI API key is set
 if not openai_api_key or not openai_api_key.startswith('sk-'):
@@ -17,45 +14,71 @@ else:
 
     # Get stored conversation or start a new one
     conversation_history = st.session_state.get('conversation', [])
-
-    # Contextual prompt
-    context_prompt = "you are a client working with me, your peer counselor. as a peer counselor, i am trained in motivational interviewing to help you work through a core dilemma. in your case, it would be getting help for your depression. let's roleplay, with me in the role of counselor and you in the role of depressed 30 year old woman who is ambivalent about doing anything about her depression. specifically, we are going to work through the elicit-provide-elicit framework for providing advice. i'll start"
-    # Generate full conversation with context
-    conversation_text = context_prompt
-    # Display the conversation history
-    # original code here 
-    for exchange in conversation_history:
-        if exchange['role'] == 'user':
-            st.write(f"👤: {exchange['message']}")
-        else:
-            st.write(f"🤖: {exchange['message']}")
-
-    for exchange in conversation_history:
-        role_icon = "👤" if exchange['role'] == 'user' else "🤖"
-        # try to substitute instead of icon, using "user" and "patient"
-        conversation_text += f"\n{role_icon}: {exchange['message']}"
     
+    # Check if in feedback mode or not
+    feedback_mode = st.session_state.get('feedback_mode', False)
 
-    # Chatbox for back and forth interaction
-    with st.form(key='chatbox'):
-        user_input = st.text_area('Your Message:', max_chars=500, height=100, key='user_input')
-        send_button = st.form_submit_button('Send')
+    if not feedback_mode:
+        # Contextual prompt for roleplaying
+        context_prompt = "you are a client working with me, your peer counselor. as a peer counselor, i am trained in motivational interviewing to help you work through a core dilemma. in your case, it would be getting help for your depression. let's roleplay, with me in the role of counselor and you in the role of depressed 30 year old woman who is ambivalent about doing anything about her depression. specifically, we are going to work through the elicit-provide-elicit framework for providing advice. i'll start"
+    # Generate full conversation with context
+        conversation_text = context_prompt
+        
+        # Display the conversation history
+        for exchange in conversation_history:
+            if exchange['role'] == 'user':
+                st.write(f"👤: {exchange['message']}")
+            else:
+                st.write(f"🤖: {exchange['message']}")
 
-    if send_button and user_input:
-        # Add user's message to the conversation
-        conversation_history.append({'role': 'user', 'message': user_input.strip()})
+        for exchange in conversation_history:
+            role_icon = "👤" if exchange['role'] == 'user' else "🤖"
+            conversation_text += f"\n{role_icon}: {exchange['message']}"
 
-        # Combine context with user's message
-        # full_prompt = f"{context_prompt}\nUser: {user_input}"
-        full_prompt = f"{conversation_text}\n👤: {user_input}"
+        with st.form(key='chatbox'):
+            user_input = st.text_area('Your Message:', max_chars=500, height=100, key='user_input')
+            send_button = st.form_submit_button('Send')
 
-        # Get model's response
-        # model_response = llm(user_input) # original input
-        model_response = llm(full_prompt)
-        conversation_history.append({'role': 'model', 'message': model_response})
+            if send_button and user_input:
+                # Add user's message to the conversation
+                conversation_history.append({'role': 'user', 'message': user_input.strip()})
 
-        # Save conversation to the session state
-        st.session_state['conversation'] = conversation_history
+                # Combine context with user's message
+                # full_prompt = f"{context_prompt}\nUser: {user_input}"
+                full_prompt = f"{conversation_text}\n👤: {user_input}"
 
-        # Refresh the page to display the updated conversation
-        st.experimental_rerun()
+                # Get model's response
+                # model_response = llm(user_input) # original input
+                model_response = llm(full_prompt)
+                conversation_history.append({'role': 'model', 'message': model_response})
+
+                # Save conversation to the session state
+                st.session_state['conversation'] = conversation_history
+
+                # Refresh the page to display the updated conversation
+                st.experimental_rerun()
+                # Button to switch to feedback mode placed outside of form context
+        
+        switch_to_feedback = st.button("Switch to Feedback Mode")
+        if switch_to_feedback:
+            st.session_state['feedback_mode'] = True
+                
+    else:
+        # Now in feedback mode
+        master_trainer_prompt = ("you are a helpful expert MI trainer. looking at the content of this conversation, can you provide feedback for specifically: 1. how I did with the elicit-provide-elicit framework, 2. anything I could improve in general, specifically with regard to adherence to the MI core principles and framework in general, and 3. what I did well ")
+        full_feedback_prompt = f"{master_trainer_prompt}\n\nConversation:\n"
+        
+        # Construct the full feedback prompt with conversation history
+        for exchange in conversation_history:
+            role_icon = "👤" if exchange['role'] == 'user' else "🤖"
+            full_feedback_prompt += f"{role_icon}: {exchange['message']}\n"
+        
+        # Get model's feedback
+        feedback = llm(full_feedback_prompt)
+        st.write(f"📋 Feedback:\n{feedback}")
+        
+        # Button to restart roleplaying (resetting everything)
+        reset_button = st.button("Restart Roleplaying")
+        if reset_button:
+            st.session_state.pop('feedback_mode', None)
+            st.session_state.pop('conversation', None)
