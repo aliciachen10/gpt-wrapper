@@ -1,5 +1,33 @@
 import streamlit as st
 from langchain.llms import OpenAI
+import psycopg2
+import os
+import urllib.parse as up
+from dotenv import load_dotenv
+
+load_dotenv()
+
+up.uses_netloc.append("postgres")
+url = up.urlparse(os.environ["DATABASE_URL"])
+conn = psycopg2.connect(database=url.path[1:],
+user=url.username,
+password=url.password,
+host=url.hostname,
+port=url.port
+)
+
+cursor = conn.cursor()
+cursor.execute("SELECT * FROM conversations LIMIT 5")  # Replace with your table name
+records = cursor.fetchall()
+
+# Print the retrieved data
+for record in records:
+    print(record)
+
+
+###########################
+## streamlit app content ##
+###########################
 
 st.title('Train MI support skills')
 
@@ -19,6 +47,7 @@ Offering MI-consistent information and advice consists of giving information in 
  						
 * After offering information or advice, we invite the person to explore how the information or advice may or may not work for them.
     """,
+
     """
 *Elicit-provide-elicit* (sometimes known as ask-offer-ask or chunk-check-chunk) combines seeking collaboration and emphasizing autonomy:
  							
@@ -27,12 +56,16 @@ Offering MI-consistent information and advice consists of giving information in 
     * “What have you heard about the ways in which people get support to stop using substances?”				
     * “What ideas do you have for transportation?”			
     * “What health services would you like to learn more about?”
+    """,
+
+    """
 *Provide* : If it sounds like some advice or information would still be helpful, provide or offer this advice or information with permission (seeking collaboration). To preserve the collaboration and increase the likelihood that they will give these options some consideration, it’s important to give the person more than one option (and acknowledge the person’s freedom to disagree or ignore the information or advice). For example:	
 
 	• “May I make a suggestion?”
  	• “Would you be interested in knowing about some resources?”
 	• “I don’t know if this would interest you, but some people find...”
- 							
+    """,
+    """
 *Elicit* : Ask for their response to the suggestion or information you have provided (seeking collaboration:	
 
     • “What do you think of these options for your situation?”
@@ -85,21 +118,29 @@ if 'current_block' not in st.session_state:
     st.session_state['current_block'] = 0
 if 'finished_reading' not in st.session_state:
     st.session_state['finished_reading'] = False
+if 'feedback_mode' not in st.session_state:
+    st.session_state['feedback_mode'] = False
 
+text_block_placeholder = st.empty()
+button_column_1, button_column_2 = st.columns(2) 
 # If the user hasn't finished reading the blocks, show the blocks
 if not st.session_state['finished_reading']:
-    st.write(text_blocks[st.session_state['current_block']])
+    text_block_placeholder.write(text_blocks[st.session_state['current_block']])
     
     if st.session_state['current_block'] > 0:
-        if st.button("Previous"):
+        if button_column_1.button("Previous"):
             st.session_state['current_block'] -= 1
+            st.experimental_rerun()
 
     if st.session_state['current_block'] < len(text_blocks) - 1:
-        if st.button("Next"):
+        if button_column_2.button("Next"):
             st.session_state['current_block'] += 1
+            st.experimental_rerun()
     else:
-        if st.button("Finish"):
+        if button_column_2.button("Finish"):
             st.session_state['finished_reading'] = True
+            st.experimental_rerun()
+            
 
 # existing GPT interaction code 
 else:
@@ -118,10 +159,10 @@ else:
 
         if not feedback_mode:
             # Contextual prompt for roleplaying
-            context_prompt = "you are a client working with me, your peer counselor. as a peer counselor, i am trained in motivational interviewing to help you work through a core dilemma. in your case, it would be getting help for your depression. let's roleplay, with me in the role of counselor and you in the role of depressed 30 year old woman who is ambivalent about doing anything about her depression. specifically, we are going to work through the elicit-provide-elicit framework for providing advice. i'll start"
+            context_prompt = "you (GPT) are a depressed client working with me, your peer counselor. as a peer counselor, i (the user) am trained in motivational interviewing to help you work through a core dilemma. in your case, it would be getting help for your depression. let's roleplay, with me (the user) in the role of counselor and you (GPT) in the role of depressed 30 year old woman who is ambivalent about doing anything about her depression. please ONLY play the role of the depressed 30-year old client, and do not say anyl lines that the counselor would say. do not use emojis or punctuation to start your responses -- start your responses as if you are merely playing the role of that patient. specifically, we are going to work through the elicit-provide-elicit framework for providing advice. i'll start"
         # Generate full conversation with context
             conversation_text = context_prompt
-            
+
             # Display the conversation history
             for exchange in conversation_history:
                 if exchange['role'] == 'user':
@@ -132,7 +173,15 @@ else:
             for exchange in conversation_history:
                 role_icon = "👤" if exchange['role'] == 'user' else "🤖"
                 conversation_text += f"\n{role_icon}: {exchange['message']}"
+                ### INSERT HERE###
+                # Define the SQL query with placeholders for the parameters
+                sql = "INSERT INTO conversations (role_column, message_column) VALUES (%s, %s)"
+                # Define the values to be inserted
+                values = (exchange['role'], exchange['message'])
 
+                cursor.execute(sql, values)
+                # Commit the transaction to save the changes to the database
+                conn.commit()
             with st.form(key='chatbox'):
                 user_input = st.text_area('Your Message:', max_chars=500, height=100, key='user_input')
                 send_button = st.form_submit_button('Send')
@@ -152,15 +201,19 @@ else:
 
                     # Save conversation to the session state
                     st.session_state['conversation'] = conversation_history
+                    # print("CONVERSATION HISTORY", st.session_state['conversation'])
 
                     # Refresh the page to display the updated conversation
                     st.experimental_rerun()
                     # Button to switch to feedback mode placed outside of form context
             
             switch_to_feedback = st.button("Switch to Feedback Mode")
-            if switch_to_feedback:
+            # if switch_to_feedback:
+            #     st.session_state['feedback_mode'] = True
+
+            # Button to switch to feedback mode (outside of the above if condition)
+            if switch_to_feedback and not st.session_state['feedback_mode']:
                 st.session_state['feedback_mode'] = True
-                    
         else:
             # Now in feedback mode
             master_trainer_prompt = ("you are a helpful expert MI trainer. looking at the content of this conversation, can you provide feedback for specifically: 1. how I did with the elicit-provide-elicit framework, 2. anything I could improve in general, specifically with regard to adherence to the MI core principles and framework in general, and 3. what I did well ")
@@ -170,13 +223,24 @@ else:
             for exchange in conversation_history:
                 role_icon = "👤" if exchange['role'] == 'user' else "🤖"
                 full_feedback_prompt += f"{role_icon}: {exchange['message']}\n"
+
+            col1, col2 = st.columns(2)
             
+            # render in the original conversation
+            with col1: 
+                st.write(f"original conversation:")
+                for exchange in conversation_history:
+                    role_icon = "👤" if exchange['role'] == 'user' else "🤖"
+                    st.write(f"\n{role_icon}: {exchange['message']}")
+
             # Get model's feedback
             feedback = llm(full_feedback_prompt)
-            st.write(f"📋 Feedback:\n{feedback}")
-            
-            # Button to restart roleplaying (resetting everything)
-            reset_button = st.button("Restart Roleplaying")
-            if reset_button:
-                st.session_state.pop('feedback_mode', None)
-                st.session_state.pop('conversation', None)
+
+            with col2: 
+                st.write(f"📋 Feedback:\n{feedback}")
+                
+                # Button to restart roleplaying (resetting everything)
+                reset_button = st.button("Restart Roleplaying")
+                if reset_button:
+                    st.session_state.pop('feedback_mode', None)
+                    st.session_state.pop('conversation', None)
