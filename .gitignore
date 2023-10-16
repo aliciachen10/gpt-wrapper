@@ -1,5 +1,7 @@
-# .devcontainer
 .streamlit
+.streamlit/
+.devcontainer
+.devcontainer/
 venv/
 .env
 .env.local
