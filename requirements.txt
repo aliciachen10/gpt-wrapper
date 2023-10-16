@@ -1,7 +1,7 @@
 streamlit>=1.26.0
 openai
 langchain
-python3-dev
+python-dev
 psycopg2-binary
 # psycopg2
 python-dotenv
