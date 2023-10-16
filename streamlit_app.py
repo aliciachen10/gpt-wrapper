@@ -8,7 +8,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 up.uses_netloc.append("postgres")
-url = up.urlparse(os.environ["DATABASE_URL"])
+# url = up.urlparse(os.environ["DATABASE_URL"])
+
+# st.write("DB username:", st.secrets["db_username"])
+url = up.urlparse(st.secrets["DATABASE_URL"])
 conn = psycopg2.connect(database=url.path[1:],
 user=url.username,
 password=url.password,
