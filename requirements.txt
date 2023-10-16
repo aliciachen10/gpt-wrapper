@@ -1,3 +1,5 @@
 streamlit>=1.26.0
 openai
 langchain
+psycopg2
+python-dotenv
