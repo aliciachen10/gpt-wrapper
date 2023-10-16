@@ -1,7 +1,7 @@
 streamlit>=1.26.0
 openai
 langchain
-psycopg2-binary=2.9.9
+psycopg2-binary==2.9.9
 # psycopg2
 python-dotenv
 sqlalchemy
