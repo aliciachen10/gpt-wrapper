@@ -44,23 +44,25 @@ def prev_page():
 
 def get_page(current_file_name, order): 
     current_file_name = current_file_name[2:-3]
-    print(current_file_name)
     pages_directory = "pages/"
+    
     # List all the files in the specified directory
     file_names = [f for f in os.listdir(pages_directory) if f.endswith('.py')]
+    
     # Extract the names without the file extension
     page_names = [os.path.splitext(file)[0] for file in file_names]
 
+    # sort page names 
     sorted_page_names = sorted(page_names)
 
+    # get truncated page names 
     final_page_names = [sorted_page_name[2:] for sorted_page_name in sorted_page_names] 
-    # # Print the list of page names
-    print(final_page_names)
 
+    # get the index for the current file name 
     index = final_page_names.index(current_file_name)
-    print(index)
+    
+    # get the name of the page to navigate to whether next or previous by index 
     if order == "next": 
         nav_page(final_page_names[index+1])
     if order == "previous":
         nav_page(final_page_names[index-1])
-    # # nav_page("module_2")
