@@ -27,7 +27,19 @@ records = cursor.fetchall()
 for record in records:
     print(record)
 
+### main app nav ###
+def main():
+    st.sidebar.title("Navigation")
+    pages = [page_one, page_two, page_three]
 
+    if 'current_page' not in st.session_state:
+        st.session_state.current_page = 0
+
+    current_page = st.session_state.current_page
+    pages[current_page]()
+
+if __name__ == "__main__":
+    main()
 ###########################
 ## streamlit app content ##
 ###########################
